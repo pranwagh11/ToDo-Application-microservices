@@ -1,0 +1,9 @@
+{
+  "name": "keepr-frontend",
+  "version": "1.0.0",
+  "description": "Static frontend for Keepr, served by a plain Node http server (no dependencies).",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  }
+}
