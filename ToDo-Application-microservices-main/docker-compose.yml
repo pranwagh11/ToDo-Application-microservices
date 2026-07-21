@@ -1,0 +1,104 @@
+# Place this file at the project TOP LEVEL — i.e. in
+# "ToDo-Application-microservices-main/", the folder that directly contains
+# "backend-services/" and "frontend_fixed/".
+#
+# The *.Dockerfile files (auth-service.Dockerfile, task-service.Dockerfile, etc.)
+# also belong at this same top level, alongside this docker-compose.yml.
+
+services:
+  
+
+  auth-service:
+    build:
+      context: ./backend-services
+      dockerfile: ../auth-service.Dockerfile
+    container_name: auth-service
+    restart: unless-stopped
+    ports:
+      - "4000:4000"
+    environment:
+      PORT: 4000
+      DB_HOST: host.docker.internal
+      DB_USER: root
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_PORT: 3306
+      DB_NAME: auth_db
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRES_IN: 1d
+    networks:
+      - todo-net
+
+  task-service:
+    build:
+      context: ./backend-services
+      dockerfile: ../task-service.Dockerfile
+    container_name: task-service
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      PORT: 5000
+      DB_HOST: host.docker.internal
+      DB_USER: root
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_PORT: 3306
+      DB_NAME: task_db
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRES_IN: 1d
+      NOTIFICATION_SERVICE_URL: http://notification-service:6000
+    depends_on:
+      notification-service:
+        condition: service_started
+    networks:
+      - todo-net
+
+  notification-service:
+    build:
+      context: ./backend-services
+      dockerfile: ../notification-service.Dockerfile
+    container_name: notification-service
+    restart: unless-stopped
+    ports:
+      - "6000:6000"
+    env_file:
+      - ./backend-services/notification-service/.env
+    environment:
+      PORT: 6000
+    networks:
+      - todo-net
+
+  api-gateway:
+    build:
+      context: ./backend-services
+      dockerfile: ../api-gateway.Dockerfile
+    container_name: api-gateway
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      PORT: 3000
+      AUTH_SERVICE_URL: http://auth-service:4000
+      TASK_SERVICE_URL: http://task-service:5000
+      NOTIFICATION_SERVICE_URL: http://notification-service:6000
+    depends_on:
+      - auth-service
+      - task-service
+      - notification-service
+    networks:
+      - todo-net
+
+  frontend:
+    build:
+      context: ./frontend_fixed
+    container_name: frontend
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    depends_on:
+      - api-gateway
+    networks:
+      - todo-net
+
+networks:
+  todo-net:
+    driver: bridge

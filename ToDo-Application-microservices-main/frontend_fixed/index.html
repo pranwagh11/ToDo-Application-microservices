@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>KeepNote — your notes, kept</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css" />
+<link rel="stylesheet" href="css/style2.css" />
+</head>
+<body>
+
+  <!-- AUTH SCREEN -->
+  <section id="authScreen" class="auth-screen">
+    <div class="auth-card">
+      <div class="auth-brand">
+        <span class="auth-brand__mark">K</span>
+        <span class="auth-brand__name">KeepNote</span>
+      </div>
+      <p class="auth-tagline">Quick notes and tasks, kept in one place.</p>
+
+      <div class="auth-tabs">
+        <button class="auth-tab is-active" data-tab="login">Log in</button>
+        <button class="auth-tab" data-tab="register">Sign up</button>
+      </div>
+
+      <form id="loginForm" class="auth-form">
+        <label class="field">
+          <span class="field__label">Email</span>
+          <input type="email" id="loginEmail" required autocomplete="email" placeholder="you@example.com" />
+        </label>
+        <label class="field">
+          <span class="field__label">Password</span>
+          <input type="password" id="loginPassword" required autocomplete="current-password" placeholder="••••••••" />
+        </label>
+        <p class="form-error" id="loginError" role="alert"></p>
+        <button type="submit" class="btn btn--primary btn--block">Log in</button>
+      </form>
+
+      <form id="registerForm" class="auth-form" hidden>
+        <label class="field">
+          <span class="field__label">Name</span>
+          <input type="text" id="registerName" required autocomplete="name" placeholder="Jane Doe" />
+        </label>
+        <label class="field">
+          <span class="field__label">Email</span>
+          <input type="email" id="registerEmail" required autocomplete="email" placeholder="you@example.com" />
+        </label>
+        <label class="field">
+          <span class="field__label">Password</span>
+          <input type="password" id="registerPassword" required autocomplete="new-password" minlength="6" placeholder="At least 6 characters" />
+        </label>
+        <p class="form-error" id="registerError" role="alert"></p>
+        <button type="submit" class="btn btn--primary btn--block">Create account</button>
+      </form>
+    </div>
+  </section>
+
+  <!-- MAIN APP -->
+  <div id="appShell" class="app-shell" hidden>
+
+    <header class="topbar">
+      <div class="topbar__brand">
+        <span class="topbar__mark">K</span>
+        <span class="topbar__name">KeepNote</span>
+      </div>
+
+      <div class="topbar__search">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 18a7.95 7.95 0 0 0 4.95-1.71l4.88 4.88 1.41-1.41-4.88-4.88A8 8 0 1 0 10 18Zm0-14a6 6 0 1 1 0 12 6 6 0 0 1 0-12Z"/></svg>
+        <input type="text" id="searchInput" placeholder="Search your notes" autocomplete="off" />
+      </div>
+
+      <div class="topbar__user">
+        <span id="userName" class="topbar__username"></span>
+        <button id="logoutBtn" class="btn btn--ghost">Log out</button>
+      </div>
+    </header>
+
+    <div class="layout">
+      <nav class="sidebar">
+        <button class="side-link is-active" data-filter="active">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 13h8V3H3v10Zm0 8h8v-6H3v6Zm10 0h8V11h-8v10Zm0-18v6h8V3h-8Z"/></svg>
+          Notes
+        </button>
+        <button class="side-link" data-filter="completed">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 16.2-3.5-3.5L4 14.2l5 5 11-11-1.5-1.5z"/></svg>
+          Completed
+        </button>
+      </nav>
+
+      <main class="content">
+
+        <!-- Composer -->
+        <div class="composer" id="composer">
+          <div class="composer__collapsed" id="composerCollapsed">
+            <span class="composer__placeholder">Take a note…</span>
+            <button class="composer__quick-add" id="quickAddBtn" title="New note" aria-label="New note">+</button>
+          </div>
+
+          <form class="composer__expanded" id="composerExpanded" hidden>
+            <input type="text" id="composerTitle" class="composer__title" placeholder="Title" autocomplete="off" />
+            <textarea id="composerBody" class="composer__body" placeholder="Take a note…" rows="3"></textarea>
+            <div class="composer__swatches" id="composerSwatches"></div>
+            <div class="composer__actions">
+              <button type="button" class="btn btn--ghost" id="composerCancel">Close</button>
+              <button type="submit" class="btn btn--primary">Save</button>
+            </div>
+          </form>
+        </div>
+
+        <p class="empty-state" id="emptyState" hidden></p>
+
+        <section class="masonry" id="notesGrid" aria-live="polite"></section>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- Note card template -->
+  <template id="noteCardTemplate">
+    <article class="note-card">
+      <div class="note-card__dogear"></div>
+      <button class="note-card__check" title="Mark complete" aria-label="Mark complete">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 16.2-3.5-3.5L4 14.2l5 5 11-11-1.5-1.5z"/></svg>
+      </button>
+      <div class="note-card__body">
+        <h3 class="note-card__title"></h3>
+        <p class="note-card__desc"></p>
+      </div>
+      <div class="note-card__footer">
+        <span class="note-card__status"></span>
+        <div class="note-card__actions">
+          <button class="icon-btn note-card__edit" title="Edit" aria-label="Edit note">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25ZM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83Z"/></svg>
+          </button>
+          <button class="icon-btn note-card__delete" title="Delete" aria-label="Delete note">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 7h12l-1 14H7L6 7Zm9.5-3-1-1h-5l-1 1H4v2h16V4h-4.5Z"/></svg>
+          </button>
+        </div>
+      </div>
+    </article>
+  </template>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script src="js/config.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
