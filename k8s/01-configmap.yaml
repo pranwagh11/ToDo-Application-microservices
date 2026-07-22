@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: todo-config
+  namespace: todo
+data:
+  # "mysql" resolves via Kubernetes' internal DNS to the mysql Service below —
+  # same idea as the "mysql" service name in docker-compose.yml.
+  DB_HOST: "mysql"
+  DB_PORT: "3306"
+  DB_USER: "root"
+  DB_NAME_AUTH: "auth_db"
+  DB_NAME_TASK: "task_db"
+  JWT_EXPIRES_IN: "1d"
+
+  # Service-to-service URLs, using Kubernetes Service DNS names
+  AUTH_SERVICE_URL: "http://auth-service:4000"
+  TASK_SERVICE_URL: "http://task-service:5000"
+  NOTIFICATION_SERVICE_URL: "http://notification-service:6000"
+
+  # Browser-facing frontend URL — used to build links inside emails
+  # (password reset link, "Open KeepNote" button). Must be reachable from
+  # wherever the user opens their email, not just from inside the cluster.
+  FRONTEND_URL: "http://<NODE_IP>:30080"
+  OTP_EXPIRES_MINUTES: "10"

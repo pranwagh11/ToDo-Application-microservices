@@ -7,7 +7,7 @@ const {
   updateTaskStatus,
   deleteTask,
 } = require('../models/taskModel');
-const { successResponse, errorResponse } = require('../../shared/utils');
+const { successResponse, errorResponse, renderTaskCompletedEmail } = require('../../shared/utils');
 const { HTTP_STATUS, TASK_STATUS } = require('../../shared/constants');
 
 async function listTasks(req, res) {
@@ -30,11 +30,7 @@ async function addTask(req, res) {
     const task = await createTask({ userId: req.user.id, title, description });
 
     // Fire-and-forget notification; do not block task creation if it fails.
-    notifyEmail({
-      to: req.user.email,
-      subject: 'New task created',
-      message: `Your task "${task.title}" was created successfully.`,
-    });
+  
 
     return successResponse(res, HTTP_STATUS.CREATED, 'Task created successfully', task);
   } catch (err) {
@@ -70,8 +66,17 @@ async function completeTask(req, res) {
 
     notifyEmail({
       to: req.user.email,
-      subject: 'Task completed',
+      subject: `Task completed: ${updated.title}`,
       message: `Your task "${updated.title}" was marked as completed.`,
+      html: renderTaskCompletedEmail({
+        title: updated.title,
+        description: updated.description,
+        completedAt: new Date().toLocaleString('en-US', {
+          dateStyle: 'medium',
+          timeStyle: 'short',
+        }),
+        appUrl: process.env.FRONTEND_URL || undefined,
+      }),
     });
 
     return successResponse(res, HTTP_STATUS.OK, 'Task marked as completed', updated);
@@ -97,12 +102,13 @@ async function removeTask(req, res) {
 
 // Best-effort call to notification-service. Errors are logged, never thrown,
 // so the user's task operation always succeeds even if email is down.
-async function notifyEmail({ to, subject, message }) {
+async function notifyEmail({ to, subject, message, html }) {
   try {
     await axios.post(`${process.env.NOTIFICATION_SERVICE_URL}/notify/email`, {
       to,
       subject,
       message,
+      html,
     });
   } catch (err) {
     console.error('Notification call failed:', err.message);

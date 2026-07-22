@@ -4,17 +4,18 @@ const { HTTP_STATUS } = require('../../shared/constants');
 
 async function sendEmail(req, res) {
   try {
-    const { to, subject, message } = req.body;
+    const { to, subject, message, html } = req.body;
 
-    if (!to || !subject || !message) {
-      return errorResponse(res, HTTP_STATUS.BAD_REQUEST, 'to, subject and message are required');
+    if (!to || !subject || (!message && !html)) {
+      return errorResponse(res, HTTP_STATUS.BAD_REQUEST, 'to, subject and (message or html) are required');
     }
 
     await transporter.sendMail({
       from: process.env.SMTP_FROM,
       to,
       subject,
-      text: message,
+      text: message || undefined,
+      html: html || undefined,
     });
 
     return successResponse(res, HTTP_STATUS.OK, 'Email sent successfully');

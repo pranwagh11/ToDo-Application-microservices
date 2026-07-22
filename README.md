@@ -40,20 +40,47 @@ cd notification-service && npm install && cd ..
 
 ## Running
 
+There are two ways to run this project: **Docker Compose** (recommended, one command) or **manually** (four terminals, no Docker).
+
+### Option A: Docker Compose
+
+From this top-level folder (the one containing `docker-compose.yml`):
+
+```bash
+cp .env.example .env
+# edit .env: set DB_PASSWORD and a real JWT_SECRET
+
+cp backend-services/notification-service/env_example.txt backend-services/notification-service/.env
+# edit that file with real SMTP credentials (or leave as-is if you don't need email)
+
+docker compose up --build
+```
+
+This starts MySQL, all four backend services, and the frontend together, wired up on an internal Docker network. `mysql`'s data persists in a named volume across restarts, and `auth_db`/`task_db` are created automatically on first boot via `init-db.sql`.
+
+Once it's up:
+- Frontend: http://localhost:8080
+- API Gateway: http://localhost:3000
+- Individual services: http://localhost:4000, :5000, :6000
+
+Stop everything with `docker compose down` (add `-v` to also wipe the MySQL volume).
+
+### Option B: Manual (no Docker)
+
 Open four terminals (or run sequentially in the background) and start each service:
 
 ```bash
 # Terminal 1
-cd auth-service && npm start
+cd backend-services/auth-service && npm start
 
 # Terminal 2
-cd task-service && npm start
+cd backend-services/task-service && npm start
 
 # Terminal 3
-cd notification-service && npm start
+cd backend-services/notification-service && npm start
 
 # Terminal 4
-cd api-gateway && npm start
+cd backend-services/api-gateway && npm start
 ```
 
 Each prints which port it's listening on. Hit `http://localhost:3000/health` to confirm the gateway is up, and `http://localhost:<port>/health` on each service individually.
@@ -62,7 +89,28 @@ Each prints which port it's listening on. Hit `http://localhost:3000/health` to 
 
 `notification-service/.env` is preset for Gmail SMTP. If using Gmail, you'll need an [App Password](https://myaccount.google.com/apppassword) (not your normal password) since Gmail blocks plain password SMTP auth. Swap `SMTP_HOST`/`SMTP_PORT` for any other provider (Mailtrap, SendGrid SMTP, etc.) if preferred.
 
-Notifications are fired by task-service as best-effort, non-blocking calls — if notification-service is down or misconfigured, task creation/completion still succeeds; the error is just logged to the console.
+Notifications are fired by auth-service and task-service as best-effort, non-blocking calls — if notification-service is down or misconfigured, registration/login/task operations still succeed; the error is just logged to the console. Three kinds of emails are sent:
+
+- **Task created** — plain-text confirmation
+- **Task completed** — an HTML "task card" (title, description, completion time, and a link back to the app), built by `shared/utils.js`'s `renderTaskCompletedEmail`
+- **Password reset** — an HTML email containing a 6-digit verification code, built by `renderPasswordResetEmail`
+
+Both auth-service and task-service need `NOTIFICATION_SERVICE_URL` set (already in their `.env` files) to reach notification-service. task-service also uses `FRONTEND_URL` to build the "Open KeepNote" button in its completion email — this must be an address the user's **browser** can reach, not a Docker/Kubernetes-internal one.
+
+## Forgot / reset password (OTP-based)
+
+| Method | Endpoint | Body | Notes |
+|---|---|---|---|
+| POST | `/auth/forgot-password` | `{ email }` | Always returns a generic success message, whether or not the email exists (prevents account enumeration). If the email matches a user, emails a 6-digit code valid for `OTP_EXPIRES_MINUTES` (default 10). |
+| POST | `/auth/reset-password` | `{ email, otp, newPassword }` | Verifies the code against the stored hash, then updates the password. Single-use — consumed on success. |
+
+Implementation notes:
+- No links or tokens in the URL — the user types the code directly into the app. This works better than a link when the email might be read on a different device than the one running the app.
+- Only a **hash** of the OTP is stored (`password_resets` table); the raw 6-digit code exists only in the email and briefly in memory during verification.
+- A new forgot-password request invalidates any earlier unused code for that user.
+- Failed verification attempts are counted (`attempts` column); after 5 wrong tries the code is invalidated and the user must request a new one — otherwise a 6-digit code (1,000,000 possibilities) would be guessable by brute force within its expiry window.
+- Hash comparison uses `crypto.timingSafeEqual` rather than `===`, so response timing can't leak partial matches.
+- The frontend flow is two steps: enter email → enter code + new password. The email is held in memory in the page's JS between steps (not the URL), so refreshing the page mid-flow means starting over.
 
 ## API Reference (via gateway on :3000)
 
@@ -72,6 +120,9 @@ Notifications are fired by task-service as best-effort, non-blocking calls — i
 | POST | `/auth/register` | No | `{ name, email, password }` |
 | POST | `/auth/login` | No | `{ email, password }` |
 | GET | `/auth/profile` | Yes | — |
+| POST | `/auth/forgot-password` | No | `{ email }` |
+| POST | `/auth/reset-password` | No | `{ email, otp, newPassword }` |
+
 
 ### Tasks
 All task routes require `Authorization: Bearer <token>`.
@@ -109,13 +160,17 @@ curl -X POST http://localhost:3000/tasks \
   -d '{"title":"Buy groceries","description":"Milk, eggs, bread"}'
 ```
 
+## Known limitations
+
+- **No DB-connection retry at startup**: `auth-service` and `task-service` call `initDb()` once on boot and `process.exit(1)` if it fails (e.g. MySQL isn't ready yet). This is fine with `docker compose` (which restarts on failure) and fine in Kubernetes (a Deployment restarts crashed pods automatically), but expect a few crash-loop restarts in the first 30–60 seconds after a cold start, until MySQL itself is ready.
+
 ## Notes on design decisions
 
-- **No Docker / no logger**: services run directly with `node server.js`, configured purely through `.env` files, per current project scope.
+- **No logger**: services run directly with `node server.js`, configured purely through `.env` files. Docker Compose (see "Running" above) is available for convenience but isn't required — everything still works with plain `node`/`npm start` too.
 - **Separate databases**: auth_db and task_db are isolated, so task-service never joins against the users table — it trusts the `user_id`/`email` embedded in the verified JWT instead.
 - **Notification trigger**: task-service calls notification-service directly over HTTP (synchronous, fire-and-forget) when a task is created or completed. This is simple but couples the two services; a message queue (RabbitMQ/Redis) would be a natural next step if reliability or retry logic becomes important.
 
 ## Frontend
 
-A Google Keep-style notes UI lives in `frontend/` — plain HTML/CSS/JS, no build step, no framework. See `frontend/README.md` for how to run it.
+A Google Keep-style notes UI lives in `frontend_fixed/` — plain HTML/CSS/JS, no build step, no framework. See `frontend_fixed/README.md` for how to run it standalone, or use Docker Compose above to run it alongside everything else.
 

@@ -1,0 +1,63 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auth-service
+  namespace: todo
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: auth-service
+  template:
+    metadata:
+      labels:
+        app: auth-service
+    spec:
+      containers:
+        - name: auth-service
+          # Replace with your actual image, e.g. docker.io/YOURUSER/auth-service:latest
+          image: YOURUSER/auth-service:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 4000
+          env:
+            - name: PORT
+              value: "4000"
+            - name: DB_HOST
+              valueFrom: { configMapKeyRef: { name: todo-config, key: DB_HOST } }
+            - name: DB_PORT
+              valueFrom: { configMapKeyRef: { name: todo-config, key: DB_PORT } }
+            - name: DB_USER
+              valueFrom: { configMapKeyRef: { name: todo-config, key: DB_USER } }
+            - name: DB_NAME
+              valueFrom: { configMapKeyRef: { name: todo-config, key: DB_NAME_AUTH } }
+            - name: JWT_EXPIRES_IN
+              valueFrom: { configMapKeyRef: { name: todo-config, key: JWT_EXPIRES_IN } }
+            - name: NOTIFICATION_SERVICE_URL
+              valueFrom: { configMapKeyRef: { name: todo-config, key: NOTIFICATION_SERVICE_URL } }
+            - name: OTP_EXPIRES_MINUTES
+              valueFrom: { configMapKeyRef: { name: todo-config, key: OTP_EXPIRES_MINUTES } }
+            - name: DB_PASSWORD
+              valueFrom: { secretKeyRef: { name: todo-secrets, key: DB_PASSWORD } }
+            - name: JWT_SECRET
+              valueFrom: { secretKeyRef: { name: todo-secrets, key: JWT_SECRET } }
+          readinessProbe:
+            httpGet: { path: /health, port: 4000 }
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /health, port: 4000 }
+            initialDelaySeconds: 15
+            periodSeconds: 15
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: auth-service
+  namespace: todo
+spec:
+  selector:
+    app: auth-service
+  ports:
+    - port: 4000
+      targetPort: 4000

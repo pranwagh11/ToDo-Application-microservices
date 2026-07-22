@@ -1,0 +1,41 @@
+# OPTIONAL — an alternative to the NodePort setup in 08-api-gateway.yaml and
+# 09-frontend.yaml. Unifies the frontend and API gateway under one host, so
+# the browser never has to know about a separate gateway port or a NodePort.
+#
+# Prerequisite: an Ingress controller must be installed. On a bare kubeadm
+# cluster, that means ingress-nginx's baremetal manifest — see K8S-DEPLOY.md.
+#
+# If you use this, you can:
+#   - switch both api-gateway and frontend Services back to ClusterIP
+#   - set frontend's API_BASE_URL env var to "" (empty string), since the
+#     frontend and the api-gateway paths will share the same origin/host
+#
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: todo-ingress
+  namespace: todo
+  annotations:
+    nginx.ingress.kubernetes.io/use-regex: "true"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: todo.local # replace with your real hostname, or keep and edit /etc/hosts
+      http:
+        paths:
+          - path: /auth
+            pathType: Prefix
+            backend:
+              service: { name: api-gateway, port: { number: 3000 } }
+          - path: /tasks
+            pathType: Prefix
+            backend:
+              service: { name: api-gateway, port: { number: 3000 } }
+          - path: /notify
+            pathType: Prefix
+            backend:
+              service: { name: api-gateway, port: { number: 3000 } }
+          - path: /
+            pathType: Prefix
+            backend:
+              service: { name: frontend, port: { number: 8080 } }
