@@ -1,4 +1,4 @@
-# Todo Microservices
+# Keepr (Todo) Microservices
 
 A simple Node.js + Express + MySQL microservices project: API Gateway, Auth Service, Task Service, and Notification Service. No Docker — each service is run directly with Node, configured via its own `.env` file.
 
